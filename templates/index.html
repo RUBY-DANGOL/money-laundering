@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AML Risk Scoring Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero-copy">
+                <p class="eyebrow">Analyst view</p>
+                <h1>Suspicious Account Review</h1>
+                <p class="hero-text">
+                    Use this page to check whether an account looks low risk, medium risk, or high risk.
+                    The form asks for account activity in plain language, then the model estimates how suspicious the account looks.
+                </p>
+            </div>
+            <div class="hero-card">
+                <p class="mini-label">Quick start</p>
+                <dl>
+                    <div><dt>1</dt><dd>Load the sample case</dd></div>
+                    <div><dt>2</dt><dd>Adjust values if needed</dd></div>
+                    <div><dt>3</dt><dd>Click score account</dd></div>
+                    <div><dt>4</dt><dd>Review the risk result</dd></div>
+                </dl>
+            </div>
+        </header>
+
+        <main class="layout">
+            <section class="panel result-panel">
+                <div class="panel-head">
+                    <h2>Risk Result</h2>
+                    <p>The model gives a probability and a plain-language risk level.</p>
+                </div>
+
+                {% if prediction is not none %}
+                    <div class="score-block">
+                        <p class="mini-label">Suspicion score</p>
+                        <p class="score">{{ "%.2f"|format(prediction * 100) }}%</p>
+                        <span class="badge badge-{{ risk_band|lower }}">{{ risk_band }} priority</span>
+                    </div>
+                    <div class="notice emphasis">{{ risk_summary }}</div>
+                {% else %}
+                    <div class="score-block empty">
+                        <p class="mini-label">Suspicion score</p>
+                        <p class="score">Waiting for review</p>
+                        <span class="badge">No result yet</span>
+                    </div>
+                {% endif %}
+
+                {% if model_error %}
+                    <div class="notice error">
+                        <strong>Model unavailable:</strong> {{ model_error }}
+                    </div>
+                {% else %}
+                    <div class="notice ok">
+                        The model is ready. Enter account activity below and score the account.
+                    </div>
+                {% endif %}
+
+                <div class="notice">
+                    This screen works best when you already have a short account summary for the review period,
+                    such as transaction counts, total amounts, cross-border share, and customer risk flags.
+                </div>
+
+                <div class="notice">
+                    Tip: If you are unsure about the advanced fields, start with <strong>Load Sample Risky Profile</strong>
+                    to see how a suspicious account can look.
+                </div>
+
+                <div class="notice">
+                    If a value is unknown, you can leave it at 0 for a basic check. For best results, fill in transaction counts,
+                    total amounts, cross-border shares, account age, and PEP or sanctions flags.
+                </div>
+            </section>
+
+            <section class="panel form-panel">
+                <div class="panel-head">
+                    <h2>Account Review Form</h2>
+                    <p>Enter the account details in the simplest way you know them. Use decimal values between 0 and 1 for shares and rates.</p>
+                </div>
+
+                <form action="/predict" method="post">
+                    {% for group_name, fields in feature_groups.items() %}
+                        <fieldset class="feature-group">
+                            <legend>{{ group_name }}</legend>
+                            <p class="group-copy">{{ group_descriptions[group_name] }}</p>
+                            <div class="grid">
+                                {% for field in fields %}
+                                    <label class="field">
+                                        <span>{{ field_meta[field]["label"] }}</span>
+                                        <input
+                                            type="number"
+                                            step="any"
+                                            name="{{ field }}"
+                                            value="{{ values[field] }}"
+                                        >
+                                        {% if field_hints.get(field) %}
+                                            <small>{{ field_hints[field] }}</small>
+                                        {% endif %}
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </fieldset>
+                    {% endfor %}
+
+                    <div class="actions">
+                        <button type="submit">Score Account</button>
+                        <button type="button" class="secondary" id="load-sample">Load Sample Risky Profile</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const sampleProfile = {{ sample_profile | tojson }};
+        const sampleButton = document.getElementById("load-sample");
+
+        sampleButton.addEventListener("click", () => {
+            Object.entries(sampleProfile).forEach(([key, value]) => {
+                const input = document.querySelector(`input[name="${key}"]`);
+                if (input) {
+                    input.value = value;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
